@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Driver Earning Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      padding: 20px;
+      background: #ffffff;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+      color: #555;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .result {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #e8f5e9;
+      border: 1px solid #c8e6c9;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Driver Earning App</h1>
+
+    <label for="uber">Uber Earning:</label>
+    <input type="number" id="uber" placeholder="Enter Uber earning">
+
+    <label for="ola">Ola Earning:</label>
+    <input type="number" id="ola" placeholder="Enter Ola earning">
+
+    <label for="rapido">Rapido Earning:</label>
+    <input type="number" id="rapido" placeholder="Enter Rapido earning">
+
+    <label for="fuel">Fuel Expense:</label>
+    <input type="number" id="fuel" placeholder="Enter fuel expense">
+
+    <label for="maintenance">Maintenance Cost:</label>
+    <input type="number" id="maintenance" placeholder="Enter maintenance cost">
+
+    <label for="da">Driver Allowance (DA):</label>
+    <input type="number" id="da" placeholder="Enter driver allowance">
+
+    <label for="fees">Fees:</label>
+    <input type="number" id="fees" placeholder="Enter fees (if any)">
+
+    <label for="penalties">Penalties:</label>
+    <input type="number" id="penalties" placeholder="Enter penalties (if any)">
+
+    <label for="notes">Notes:</label>
+    <input type="text" id="notes" placeholder="Optional notes (e.g., extra parking fees)">
+
+    <button onclick="calculateProfit()">Submit</button>
+    <h2>Export Summary</h2>
+    <ul>
+      <li><a href="http://localhost:5000/api/export-summary/weekly
+">Download Current Weekly Summary</a></li>
+      <li><a href="http://localhost:5000/api/export-summary/06/2025
+">Download July 2025 Summary</a></li>
+      <li><a href="http://localhost:5000/api/export-summary/2025
+">Download 2025 Yearly Summary</a></li>
+
+    </ul>
+
+    <div class="result" id="result"></div>
+    <hr>
+    <h2>Log a Holiday</h2>
+
+    <label for="holidayDate">Date:</label>
+    <input type="date" id="holidayDate">
+
+    <label for="holidayReason">Reason (optional):</label>
+    <input type="text" id="holidayReason" placeholder="e.g. Sick leave, festival">
+
+    <button onclick="submitHoliday()">Save Holiday</button>
+
+  </div>
+
+  <script>
+async function submitHoliday() {
+  const date = document.getElementById("holidayDate").value;
+  const reason = document.getElementById("holidayReason").value;
+
+  if (!date) {
+    alert("Please select a holiday date");
+    return;
+  }
+
+  try {
+    const res = await fetch("http://localhost:5000/api/holidays", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, reason })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to save holiday");
+    }
+
+    alert("✅ Holiday saved successfully!");
+    document.getElementById("holidayDate").value = "";
+    document.getElementById("holidayReason").value = "";
+
+  } catch (err) {
+    console.error("❌ Holiday error:", err);
+    alert(err.message);
+  }
+}
+
+    async function calculateProfit() {
+      const uber = parseFloat(document.getElementById('uber').value) || 0;
+      const ola = parseFloat(document.getElementById('ola').value) || 0;
+      const rapido = parseFloat(document.getElementById('rapido').value) || 0;
+      const fuel = parseFloat(document.getElementById('fuel').value) || 0;
+      const maintenance = parseFloat(document.getElementById('maintenance').value) || 0;
+      const da = parseFloat(document.getElementById('da').value) || 0;
+
+      const totalEarning = uber + ola + rapido;
+      const totalExpense = fuel + maintenance + da;
+      const profit = totalEarning - totalExpense;
+
+      const todayDate = new Date().toISOString().split('T')[0];
+
+      try {
+        // Save earnings
+        const earnRes = await fetch('http://localhost:5000/api/earnings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uber, ola, rapido,
+            date: todayDate
+          })
+        });
+
+        if (!earnRes.ok) throw new Error('Failed to save earnings');
+
+        // Save expenses (fuel, maintenance, da)
+        const expenses = [
+          { type: 'Fuel', amount: fuel, date: todayDate },
+          { type: 'Maintenance', amount: maintenance, date: todayDate },
+          { type: 'DA', amount: da, date: todayDate }
+        ];
+
+        const expRes = await fetch('http://localhost:5000/api/expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(expenses)
+        });
+
+        if (!expRes.ok) throw new Error('Failed to save expenses');
+
+        // Success output
+        document.getElementById('result').innerHTML = `
+        <strong style="color: green;">✅ Saved Successfully!</strong><br><br>
+        <strong>Total Earning:</strong> ₹${totalEarning.toFixed(2)}<br>
+        <strong>Total Expenses:</strong> ₹${totalExpense.toFixed(2)}<br>
+        <strong>Net Profit:</strong> ₹${profit.toFixed(2)}
+      `;
+      } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error submitting data: ' + error.message);
+      }
+    }
+  </script>
+</body>
+
+</html>
